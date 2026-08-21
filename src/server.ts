@@ -3,12 +3,13 @@ import { Server, Socket } from 'socket.io';
 import { messageType } from './types';
 import { routeMessage } from './router';
 import { disconnectPlayer } from './gameRoom';
+import { isFullyConnected } from './utils';
 
 const httpServer = createServer();
 const io = new Server(httpServer, {
   cors: { origin: '*' }
 });
-
+console.log('Maze connected:', isFullyConnected());
 io.on('connection', (socket: Socket) => {
   console.log('player connected:', socket.id);
 

@@ -3,7 +3,8 @@ import { Server } from 'socket.io';
 import { gameStates, endGame } from "./gameRoom";
 import { GameState } from "./types";
 import { getWalkableTiles } from "./maze";
-
+import { GridPos } from "./maze";
+import { MAZE_GRID } from "./maze";
 export function generateRoomId(): string {
     let id: string;
     do {
@@ -86,4 +87,34 @@ export function scheduleRespawn(gameState: GameState, socketId: string, io: Serv
             payload: { socketId, pos: spawnTile },
         });
     }, 3000);
+}
+
+export function isFullyConnected(): boolean {
+  const walkable = getWalkableTiles();
+  if (walkable.length === 0) return false;
+
+  const visited = new Set<string>();
+  const key = (p: GridPos) => `${p.row},${p.col}`;
+  const queue: GridPos[] = [walkable[0]];
+  visited.add(key(walkable[0]));
+
+  const deltas = [[-1,0],[1,0],[0,-1],[0,1]];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const [dr, dc] of deltas) {
+      const next = { row: current.row + dr, col: current.col + dc };
+      if (
+        next.row >= 0 && next.row < MAZE_GRID.length &&
+        next.col >= 0 && next.col < MAZE_GRID[0].length &&
+        MAZE_GRID[next.row][next.col] === 1 &&
+        !visited.has(key(next))
+      ) {
+        visited.add(key(next));
+        queue.push(next);
+      }
+    }
+  }
+
+  return visited.size === walkable.length;
 }
