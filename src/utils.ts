@@ -1,6 +1,6 @@
 import { rooms } from "./gameRoom";
 import { Server } from 'socket.io';
-import { gameStates } from "./gameRoom";
+import { gameStates, endGame } from "./gameRoom";
 import { GameState } from "./types";
 import { getWalkableTiles } from "./maze";
 
@@ -16,13 +16,15 @@ export function rotateKiller(roomId: string, io: Server): void {
     const gameState = gameStates.get(roomId);
     if (!gameState) return;
     const previousKillerId = gameState.killerId;
-    gameState.killerTurnIndex++;
 
-    // If everyone has had a turn, end the game (we'll build this properly later)
-    if (gameState.killerTurnIndex >= gameState.killerOrder.length) {
-        // TODO: end game logic — placeholder for now
-        return;
-    }
+    // Advance the index, skipping over anyone who's disconnected
+    do {
+        gameState.killerTurnIndex++;
+        if (gameState.killerTurnIndex >= gameState.killerOrder.length) {
+            endGame(roomId, io);
+            return;
+        }
+    } while (gameState.disconnectedSocketIds.has(gameState.killerOrder[gameState.killerTurnIndex]));
 
     const newKillerId = gameState.killerOrder[gameState.killerTurnIndex];
     gameState.killerId = newKillerId;

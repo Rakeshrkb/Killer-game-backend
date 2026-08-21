@@ -185,6 +185,19 @@ export function disconnectPlayer(socket: any, io: Server): void {
                 result: "success",
                 payload: { socketId: socket.id },
             });
+            const gameState = gameStates.get(roomId);
+            if (gameState) {
+                const player = gameState.players.get(socket.id);
+                if (player) {
+                    gameState.disconnectedSocketIds.add(socket.id);
+                    gameState.players.delete(socket.id);
+                    io.to(roomId).emit("message", {
+                        action: "PLAYER_LEFT_THE_GAME",
+                        result: "success",
+                        payload: { socketId: socket.id, name: player.name },
+                    });
+                }
+            }
             socket.leave(roomId);
             if (room.players.size === 0) {
                 rooms.delete(roomId);
@@ -297,11 +310,12 @@ export function startGame(socket: any, io: Server): any {
         killerTurnIndex,
         rotationTimer: null, // we'll set this up next
         startedAt: Date.now(),
-        durationMs: playerIds.length * 60000,
+        durationMs: playerIds.length * 20000,
+        disconnectedSocketIds: new Set()
     };
     gameState.rotationTimer = setInterval(() => {
         rotateKiller(roomId, io);
-    }, 60000);
+    }, 20000);
     gameStates.set(roomId, gameState);
 
     // Broadcast to everyone — grid, player positions, duration. NO killer info here.
@@ -382,4 +396,28 @@ export function movePlayer(socket: any, direction: string, io: Server): void {
         payload: { socketId: socket.id, pos: target },
     });
     checkForKill(gameState, io);
+}
+
+export function endGame(roomId: string, io: Server): void {
+    const gameState = gameStates.get(roomId);
+    if (!gameState) return;
+
+    const room = rooms.get(roomId);
+    if (room) room.status = 'ENDED';
+
+    if (gameState.rotationTimer) {
+        clearInterval(gameState.rotationTimer);
+    }
+
+    const standings = Array.from(gameState.players.values())
+        .map((p) => ({ socketId: p.socketId, name: p.name, kills: p.kills }))
+        .sort((a, b) => b.kills - a.kills);
+
+    io.to(roomId).emit("message", {
+        action: "GAME_ENDED",
+        result: "success",
+        payload: { standings },
+    });
+
+    gameStates.delete(roomId);
 }

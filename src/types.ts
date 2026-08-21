@@ -44,6 +44,7 @@ export type GameState = {
   rotationTimer: NodeJS.Timeout | null; // handle so we can clear it later (game end, room close, etc)
   startedAt: number;
   durationMs: number;
+  disconnectedSocketIds: Set<string>;
 };
 
 
