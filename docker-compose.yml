@@ -2,6 +2,24 @@ services:
   backend:
     build: .
     container_name: killer-game-backend
-    ports:
-      - "3001:3001"
     restart: unless-stopped
+    expose:
+      - "3001"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: killer-game-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+
+volumes:
+  caddy_data:
+  caddy_config:
