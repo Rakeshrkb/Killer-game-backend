@@ -4,9 +4,18 @@ import { messageType } from './types';
 import { routeMessage } from './router';
 import { disconnectPlayer } from './gameRoom';
 import { loadCount, saveCount } from './utils';
+const ALLOWED_ORIGINS = [
+  'https://puke222earn-killer-game-lobby.kill-your-friend.workers.dev',
+  'https://game.kill-your-friend.workers.dev',
+];
 
 let visitorCount = loadCount();
 const httpServer = createServer((req, res) => {
+  const origin = req.headers.origin;
+  const corsHeaders: Record<string, string> = {};
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    corsHeaders['Access-Control-Allow-Origin'] = origin;
+  }
   try {
     if (req.method === 'GET' && req.url === '/api/visit') {
       visitorCount++;
@@ -39,7 +48,10 @@ const httpServer = createServer((req, res) => {
   }
 });
 const io = new Server(httpServer, {
-  cors: { origin: '*' }
+  cors: {
+    origin: ALLOWED_ORIGINS,
+    methods: ['GET', 'POST'],
+  }
 });
 
 io.on('connection', (socket: Socket) => {
