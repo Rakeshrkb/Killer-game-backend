@@ -5,6 +5,9 @@ import { GameState } from "./types";
 import { getWalkableTiles } from "./maze";
 import { GridPos } from "./maze";
 import { MAZE_GRID } from "./maze";
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+const COUNT_FILE = './visitor-count.json';
+
 export function generateRoomId(): string {
     let id: string;
     do {
@@ -118,3 +121,20 @@ export function isFullyConnected(): boolean {
 
   return visited.size === walkable.length;
 }
+
+export function loadCount(): number {
+  if (existsSync(COUNT_FILE)) {
+    try {
+      return JSON.parse(readFileSync(COUNT_FILE, 'utf-8')).count ?? 0;
+    } catch {
+      return 0;
+    }
+  }
+  return 0;
+}
+
+export function saveCount(count: number) {
+  writeFileSync(COUNT_FILE, JSON.stringify({ count }));
+}
+
+let visitorCount = loadCount();

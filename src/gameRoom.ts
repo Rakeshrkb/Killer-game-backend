@@ -12,7 +12,6 @@ export const gameStates = new Map<string, GameState>();
 
 export function setPlayerName(socket: any, name: string) {
     playerNames.set(socket.id, name);
-    console.log(`Player ${socket.id} set name to ${name}`);
     socket.emit("message", {
         action: sendEventTypes.NAME_SET,
         result: "success",

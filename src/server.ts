@@ -3,19 +3,39 @@ import { Server, Socket } from 'socket.io';
 import { messageType } from './types';
 import { routeMessage } from './router';
 import { disconnectPlayer } from './gameRoom';
-import { isFullyConnected } from './utils';
+import { loadCount, saveCount } from './utils';
 
-const httpServer = createServer();
+let visitorCount = loadCount();
+const httpServer = createServer((req, res) => {
+  if (req.method === 'GET' && req.url === '/api/visit') {
+    visitorCount++;
+    saveCount(visitorCount);
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.end(JSON.stringify({ count: visitorCount }));
+    return;
+  }
+  if (req.method === 'GET' && req.url === '/api/stats') {
+    const onlineCount = io.engine.clientsCount; // live count, built into Socket.IO
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.end(JSON.stringify({ online: onlineCount, totalVisits: visitorCount }));
+    return;
+  }
+
+});
 const io = new Server(httpServer, {
   cors: { origin: '*' }
 });
-console.log('Maze connected:', isFullyConnected());
+
 io.on('connection', (socket: Socket) => {
-  console.log('player connected:', socket.id);
 
   socket.on('disconnect', () => {
-    console.log('player disconnected:', socket.id);
-    disconnectPlayer(socket,io);
+    disconnectPlayer(socket, io);
   });
 
   socket.on('message', (raw: any) => {

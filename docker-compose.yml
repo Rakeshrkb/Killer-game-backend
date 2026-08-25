@@ -1,6 +1,8 @@
 services:
   backend:
     build: .
+    volumes:
+      - visitor_data:/app/visitor-count.json
     container_name: killer-game-backend
     restart: unless-stopped
     expose:
@@ -23,3 +25,4 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+  visitor_data:
