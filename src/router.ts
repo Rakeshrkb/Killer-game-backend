@@ -1,5 +1,5 @@
 import { Server } from 'socket.io';
-import { createRoom, joinRoom, kickPlayerFromRoom, setPlayerName, togglePlayerReady, leaveRoom, startGame, movePlayer } from './gameRoom';
+import { createRoom, joinRoom, kickPlayerFromRoom, setPlayerName, togglePlayerReady, leaveRoom, startGame, movePlayer, playAgain } from './gameRoom';
 export const routeMessage = (message: any, socket: any, io: Server) => {
     switch (message.action) {
         case "SET_NAME":
@@ -25,6 +25,9 @@ export const routeMessage = (message: any, socket: any, io: Server) => {
             break;
         case "MOVE":
             movePlayer(socket, message.payload.direction, io);
+            break;
+        case "PLAY_AGAIN":
+            playAgain(socket, io);
             break;
         default:
             console.warn("Unknown action:", message.action);

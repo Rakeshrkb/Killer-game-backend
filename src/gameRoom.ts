@@ -1,6 +1,6 @@
 import { roomDetails, Player } from './types';
 import { Server } from 'socket.io';
-import { generateRoomId, rotateKiller, checkForKill } from './utils';
+import { generateRoomId, rotateKiller, checkForKill, resolveRematchWindow } from './utils';
 import { sendEventTypes } from './types';
 import { MAZE_GRID, pickRandomSpawnTiles, GridPos } from './maze';
 import { GamePlayer, GameState } from './types';
@@ -68,6 +68,9 @@ export function createRoom(socket: any) {
         hostId: socket.id,
         status: 'IN_LOBBY',
         players: new Map<string, Player>(),
+        rematchVotes: new Set(),
+        rematchDeadline: null,
+        rematchTimer: null
     };
     room.players.set(socket.id, {
         socketId: socket.id,
@@ -139,14 +142,23 @@ export function roomToPublicState(room: roomDetails) {
 export function leaveRoom(socket: any, io: Server): void {
     const roomId = socket.data.roomId;
     const room = rooms.get(roomId);
+    if(!room){
+        return;
+    }
     if (room) {
         let playerName = playerNames.get(socket.id) || '';
         room.players.delete(socket.id);
+        room.rematchVotes.delete(socket.id);
         socket.to(roomId).emit("message", {
             action: sendEventTypes.PLAYER_LEFT,
             result: "success",
             payload: { socketId: socket.id, name: playerName },
         });
+        if (room.status === 'ENDED') {
+            if (room.players.size === room.rematchVotes.size) {
+                resolveRematchWindow(room, io);
+            }
+        }
         socket.leave(roomId);
         if (room.players.size === 0) {
             rooms.delete(roomId);
@@ -179,6 +191,14 @@ export function disconnectPlayer(socket: any, io: Server): void {
     for (const [roomId, room] of rooms.entries()) {
         if (room.players.has(socket.id)) {
             room.players.delete(socket.id);
+            if (room.rematchVotes.has(socket.id)) {
+                room.rematchVotes.delete(socket.id);
+            }
+            if (room.status === "ENDED") {
+                if (room.players.size === room.rematchVotes.size) {
+                    resolveRematchWindow(room, io);
+                }
+            }
             io.to(roomId).emit("message", {
                 action: sendEventTypes.PLAYER_DISCONNECTED,
                 result: "success",
@@ -402,7 +422,12 @@ export function endGame(roomId: string, io: Server): void {
     if (!gameState) return;
 
     const room = rooms.get(roomId);
-    if (room) room.status = 'ENDED';
+    if (room) {
+        room.status = 'ENDED';
+        room.rematchVotes = new Set()
+        room.rematchDeadline = Date.now() + 15000;
+        room.rematchTimer = setTimeout(() => resolveRematchWindow(room, io), 15000);
+    }
 
     if (gameState.rotationTimer) {
         clearInterval(gameState.rotationTimer);
@@ -411,12 +436,45 @@ export function endGame(roomId: string, io: Server): void {
     const standings = Array.from(gameState.players.values())
         .map((p) => ({ socketId: p.socketId, name: p.name, kills: p.kills }))
         .sort((a, b) => b.kills - a.kills);
-
+    if(!room) return;
     io.to(roomId).emit("message", {
         action: "GAME_ENDED",
         result: "success",
-        payload: { standings },
+        payload: { standings, rematchDeadline: room.rematchDeadline },
     });
 
     gameStates.delete(roomId);
+}
+
+export function playAgain(socket: any, io: Server): void {
+    console.log("play again hit");
+    const roomId = socket.data.roomId;
+    const room = rooms.get(roomId);
+    if (!room) {
+        return socket.emit("message", { action: "ERROR", result: "failure", reason: "Room not found" });
+    }
+    const playerIds = Array.from(room.players.keys());
+    if (!playerIds.includes(socket.id)) {
+        return socket.emit("message", { action: "ERROR", result: "failure", reason: "Player not found" });
+    }
+    room.rematchVotes.add(socket.id);
+    if (room.rematchVotes.size === 1) {
+        room.hostId = socket.id;
+        room.players.forEach(p => {
+            if (p.socketId != socket.id) {
+                p.isHost = false;
+            } else {
+                p.isHost = true;
+            }
+        })
+    }
+    io.to(roomId).emit("message", { action: "REMATCH_UPDATE", result: "success", votedCount: room.rematchVotes.size, totalCount: room.players.size, hostId: room.hostId })
+
+    if (room.rematchVotes.size === room.players.size) {
+        if (room.rematchTimer) {
+            clearTimeout(room.rematchTimer);
+        }
+        resolveRematchWindow(room, io);
+    }
+
 }
