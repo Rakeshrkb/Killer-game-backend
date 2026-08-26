@@ -83,7 +83,6 @@ export function createRoom(socket: any) {
     rooms.set(room.roomId, room);
     socket.join(roomId);
     socket.data.roomId = roomId;
-    console.log("Room created:", roomId);
     socket.emit("message", {
         action: "ROOM_CREATED",
         result: "success",
@@ -112,9 +111,6 @@ export function joinRoom(socket: any, roomId: any, io: Server): void {
             result: "success",
             payload: roomToPublicState(room),
         });
-
-        console.log(`${newPlayer.name} joined the room`);
-
         // Tell EVERYONE ELSE just the new player
         socket.to(roomId).emit("message", {
             action: "PLAYER_JOINED",
@@ -142,7 +138,7 @@ export function roomToPublicState(room: roomDetails) {
 export function leaveRoom(socket: any, io: Server): void {
     const roomId = socket.data.roomId;
     const room = rooms.get(roomId);
-    if(!room){
+    if (!room) {
         return;
     }
     if (room) {
@@ -170,7 +166,6 @@ export function leaveRoom(socket: any, io: Server): void {
             }
             room.hostId = newHostId;
             room.players.get(newHostId)!.isHost = true;
-            console.log(`${playerName} left the room`);
             io.to(roomId).emit("message", {
                 action: sendEventTypes.HOST_CHANGED,
                 result: "success",
@@ -259,7 +254,6 @@ export function kickPlayerFromRoom(socket: any, io: Server, targetSocketId: stri
 
     // remove them from the Socket.IO room so they stop receiving room broadcasts
     io.sockets.sockets.get(targetSocketId)?.leave(roomId);
-    console.log(`Host Kicked ${kickedPlayer?.name}`);
 
     // tell everyone else who got kicked
     io.to(roomId).emit("message", {
@@ -436,7 +430,7 @@ export function endGame(roomId: string, io: Server): void {
     const standings = Array.from(gameState.players.values())
         .map((p) => ({ socketId: p.socketId, name: p.name, kills: p.kills }))
         .sort((a, b) => b.kills - a.kills);
-    if(!room) return;
+    if (!room) return;
     io.to(roomId).emit("message", {
         action: "GAME_ENDED",
         result: "success",
@@ -447,7 +441,6 @@ export function endGame(roomId: string, io: Server): void {
 }
 
 export function playAgain(socket: any, io: Server): void {
-    console.log("play again hit");
     const roomId = socket.data.roomId;
     const room = rooms.get(roomId);
     if (!room) {
@@ -468,7 +461,7 @@ export function playAgain(socket: any, io: Server): void {
             }
         })
     }
-    io.to(roomId).emit("message", { action: "REMATCH_UPDATE", result: "success", votedCount: room.rematchVotes.size, totalCount: room.players.size, hostId: room.hostId })
+    io.to(roomId).emit("message", { action: "REMATCH_UPDATE", result: "success", payload: { votedCount: room.rematchVotes.size, totalCount: room.players.size, hostId: room.hostId } })
 
     if (room.rematchVotes.size === room.players.size) {
         if (room.rematchTimer) {

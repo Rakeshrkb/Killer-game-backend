@@ -61,5 +61,7 @@ io.on('connection', (socket: Socket) => {
 });
 
 httpServer.listen(3001, '0.0.0.0', () => {
-  console.log('Server running on port 3001');
+  console.log("--------------------------------");
+  console.log('WS Server running on port 3001');
+  console.log("--------------------------------");
 });
