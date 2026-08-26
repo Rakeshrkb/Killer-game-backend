@@ -148,7 +148,10 @@ export function resolveRematchWindow(room: roomDetails, io: Server) {
       toRemove.push(p.socketId);
     }
   });
-  toRemove.forEach(socketId => room.players.delete(socketId));
+  toRemove.forEach(socketId => {
+    room.players.delete(socketId);
+    io.sockets.sockets.get(socketId)?.leave(room.roomId); // <-- the missing piece
+  });
 
   if (room.players.size === 0) {
     rooms.delete(room.roomId);
