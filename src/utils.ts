@@ -6,7 +6,6 @@ import { getWalkableTiles } from "./maze";
 import { GridPos } from "./maze";
 import { MAZE_GRID } from "./maze";
 import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { emit } from "cluster";
 const COUNT_FILE = './data/visitor-count.json';
 
 export function generateRoomId(): string {
