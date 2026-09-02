@@ -1,6 +1,6 @@
 services:
   backend:
-    build: .
+    image: ghcr.io/rakeshrkb/killer-game-backend:latest
     volumes:
       - visitor_data:/app/data
     container_name: killer-game-backend
