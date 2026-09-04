@@ -6,4 +6,4 @@ services:
     expose:
       - "3001"
     environment:
-      - REDIS_URL=redis://<EXISTING_INSTANCE_PRIVATE_IP>:6379
+      - REDIS_URL=redis://ip-172-31-10-99.ap-south-1.compute.internal:6379
