@@ -1,5 +1,5 @@
 import { Server } from 'socket.io';
-import { createRoom, joinRoom, kickPlayerFromRoom, setPlayerName, togglePlayerReady, leaveRoom, startGame, movePlayer, playAgain } from './gameRoom';
+import { createRoom, joinRoom, kickPlayerFromRoom, setPlayerName, togglePlayerReady, leaveRoom, startGame, movePlayer, playAgain } from './gameRoomInRedis';
 import { sendMessage } from './chatRoom';
 export const routeMessage = (message: any, socket: any, io: Server) => {
     switch (message.action) {

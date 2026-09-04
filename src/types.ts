@@ -15,7 +15,7 @@ export type roomDetails = {
 }
 
 export type roomStatus = 'IN_LOBBY' | 'STARTED' | 'ENDED';
-
+export type RoomStatus = 'IN_LOBBY' | 'STARTED' | 'ENDED';
 
 export type PlayerStatus = 'CONNECTED' | 'DISCONNECTED';
 
@@ -62,4 +62,13 @@ export const sendEventTypes = {
   NAME_SET: "NAME_SET",
   PLAYER_KICKED: "PLAYER_KICKED",
   ERROR: "ERROR"
+};
+
+export type RoomSnapshot = {
+  roomId: string;
+  hostId: string;
+  status: RoomStatus;
+  players: Player[];
+  rematchVotes: string[];
+  rematchDeadline: number | null;
 };

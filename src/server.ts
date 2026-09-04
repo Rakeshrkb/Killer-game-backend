@@ -2,8 +2,14 @@ import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import { messageType } from './types';
 import { routeMessage } from './router';
-import { disconnectPlayer } from './gameRoom';
+import { disconnectPlayer } from './gameRoomInRedis';
 import { loadCount, saveCount } from './utils';
+import { startRotationSweep } from './rotationScheduler';
+import { startRespawnSweep } from './respawnScheduler';
+import { startRematchSweep } from './rematchScheduler';
+import { resolveRematchWindow } from './gameRoomInRedis';
+import { redis, subClient } from "./redisClient";
+import { createAdapter } from '@socket.io/redis-adapter';
 const ALLOWED_ORIGINS = [
   'https://puke222earn-killer-game-lobby.kill-your-friend.workers.dev',
   'https://game.kill-your-friend.workers.dev',
@@ -45,8 +51,12 @@ const io = new Server(httpServer, {
   cors: {
     origin: ALLOWED_ORIGINS,
     methods: ['GET', 'POST'],
-  }
+  },
+  adapter: createAdapter(redis, subClient),
 });
+startRotationSweep(io);
+startRespawnSweep(io);
+startRematchSweep(io, resolveRematchWindow);
 
 io.on('connection', (socket: Socket) => {
 
@@ -58,6 +68,17 @@ io.on('connection', (socket: Socket) => {
     const message: messageType = typeof raw === 'string' ? JSON.parse(raw) : raw;
     routeMessage(message, socket, io);
   });
+});
+
+redis.on('error', (err) => console.error('Redis pub client error:', err));
+subClient.on('error', (err) => console.error('Redis sub client error:', err));
+
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, shutting down gracefully...');
+  httpServer.close();
+  await redis.quit();
+  await subClient.quit();
+  process.exit(0);
 });
 
 httpServer.listen(3001, '0.0.0.0', () => {

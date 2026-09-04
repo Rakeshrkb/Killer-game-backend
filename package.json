@@ -11,6 +11,8 @@
   "keywords": [],
   "type": "commonjs",
   "dependencies": {
+    "@socket.io/redis-adapter": "^8.3.0",
+    "ioredis": "^6.0.0",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {

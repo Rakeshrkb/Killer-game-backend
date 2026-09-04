@@ -4,6 +4,8 @@ import { generateRoomId, rotateKiller, checkForKill, resolveRematchWindow } from
 import { sendEventTypes } from './types';
 import { MAZE_GRID, pickRandomSpawnTiles, GridPos } from './maze';
 import { GamePlayer, GameState } from './types';
+import { ROTATION_DURATION_MS, scheduleNextRotation, cancelRotation } from './rotationScheduler';
+import { redis } from './redisClient';
 
 export const rooms = new Map<string, roomDetails>();
 export const playerNames = new Map<string, string>();
@@ -313,6 +315,13 @@ export function startGame(socket: any, io: Server): any {
     const killerOrder = [...playerIds].sort(() => Math.random() - 0.5);
     const killerTurnIndex = 0;
     const killerId = killerOrder[killerTurnIndex];
+    redis.hset(`game:${roomId}`, {
+        status: "ACTIVE",
+        killerOrder: JSON.stringify(killerOrder),
+        killerTurnIndex: 0,
+        killerId: killerOrder[0],
+    });
+    scheduleNextRotation(roomId, ROTATION_DURATION_MS);
 
     const gameState: GameState = {
         roomId,
@@ -328,7 +337,7 @@ export function startGame(socket: any, io: Server): any {
     };
     gameState.rotationTimer = setInterval(() => {
         rotateKiller(roomId, io);
-    }, 20000);
+    }, ROTATION_DURATION_MS);
     gameStates.set(roomId, gameState);
 
     // Broadcast to everyone — grid, player positions, duration. NO killer info here.
@@ -438,6 +447,7 @@ export function endGame(roomId: string, io: Server): void {
     });
 
     gameStates.delete(roomId);
+    cancelRotation(roomId);
 }
 
 export function playAgain(socket: any, io: Server): void {
