@@ -1,0 +1,46 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: killer-game-redis-local
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - redis_data_local:/data
+
+  backend1:
+    build: .
+    container_name: killer-game-backend-1
+    restart: unless-stopped
+    expose:
+      - "3001"
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+
+  backend2:
+    build: .
+    container_name: killer-game-backend-2
+    restart: unless-stopped
+    expose:
+      - "3001"
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: killer-game-caddy-local
+    restart: unless-stopped
+    ports:
+      - "8090:80"
+    volumes:
+      - ./Caddyfile.local:/etc/caddy/Caddyfile
+    depends_on:
+      - backend1
+      - backend2
+
+volumes:
+  redis_data_local:

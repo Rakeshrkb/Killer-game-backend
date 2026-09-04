@@ -1,0 +1,57 @@
+name: Build and Deploy (Distributed)
+
+on:
+  push:
+    branches: [feature/redis-distributed-architecture]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/rakeshrkb/killer-game-backend:redis-distributed
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Deploy to both backend instances
+        run: |
+          aws ssm send-command \
+            --instance-ids "i-0b59c69efb86e810f" "i-08c76d96829d4cca2" \
+            --document-name "AWS-RunShellScript" \
+            --parameters commands='[
+              "sudo -u ubuntu -i bash -c \"cd /home/ubuntu/Killer-game-backend && git pull && docker compose -f docker-compose.backend.yml pull && docker compose -f docker-compose.backend.yml up -d\""
+            ]' \
+            --region ap-south-1
+
+      - name: Deploy to Caddy/Redis instance
+        run: |
+          aws ssm send-command \
+            --instance-ids "i-037a6772e7a98488a" \
+            --document-name "AWS-RunShellScript" \
+            --parameters commands='[
+              "sudo -u ubuntu -i bash -c \"cd /home/ubuntu/Killer-game-backend && git pull && docker compose -f docker-compose.caddyAndRedis.yml up -d\""
+            ]' \
+            --region ap-south-1
