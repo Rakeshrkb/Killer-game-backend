@@ -3,7 +3,7 @@ services:
     image: ghcr.io/rakeshrkb/killer-game-backend:redis-distributed
     container_name: killer-game-backend
     restart: unless-stopped
-    expose:
-      - "3001"
+    ports:
+      - "3001:3001"
     environment:
       - REDIS_URL=redis://ip-172-31-10-99.ap-south-1.compute.internal:6379
