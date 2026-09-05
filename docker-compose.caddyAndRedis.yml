@@ -15,6 +15,9 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      - BACKEND1_ADDR=${BACKEND1_ADDR}
+      - BACKEND2_ADDR=${BACKEND2_ADDR}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data

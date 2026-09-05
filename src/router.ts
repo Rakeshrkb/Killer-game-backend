@@ -1,6 +1,6 @@
 import { Server } from 'socket.io';
 import { createRoom, joinRoom, kickPlayerFromRoom, setPlayerName, togglePlayerReady, leaveRoom, startGame, movePlayer, playAgain } from './gameRoomInRedis';
-import { sendMessage } from './chatRoom';
+import { sendMessage } from './chatRoomInRedis';
 export const routeMessage = (message: any, socket: any, io: Server) => {
     switch (message.action) {
         case "SET_NAME":
