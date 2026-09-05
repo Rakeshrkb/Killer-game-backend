@@ -324,7 +324,7 @@ export async function startGame(socket: any, io: Server): Promise<any> {
 
     const killerOrder = [...playerIds].sort(() => Math.random() - 0.5);
     const killerId = killerOrder[0];
-    setCachedKillerId(roomId, killerId);
+    await setCachedKillerId(roomId, killerId);
     const durationMs = playerIds.length * 20000;
 
     await redis.hset(`game:${roomId}`, {

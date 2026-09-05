@@ -109,8 +109,8 @@ async function executeRotation(roomId: string, io: Server) {
     action: "YOU_ARE_KILLER",
     result: "success",
   });
-  
-  setCachedKillerId(roomId, newKillerId);
+
+  await setCachedKillerId(roomId, newKillerId);
 }
 
 export function startRotationSweep(io: Server) {
