@@ -10,6 +10,9 @@ import { pickRandomSpawnTiles, MAZE_GRID, GridPos } from './maze';
 import { getGameGrid, clearGridCache } from './gridCache';
 import { scheduleRespawn, cancelRespawn } from './respawnScheduler';
 import { cancelRematchResolution, scheduleRematchResolution } from './rematchScheduler';
+import { getCachedKillerId, setCachedKillerId, clearKillerIdCache } from "./killerIdCache";
+
+
 export async function setPlayerName(socket: any, name: string) {
     await setPlayerNameStore(socket.id, name);
     socket.name = name;
@@ -90,7 +93,7 @@ export async function joinRoom(socket: any, roomId: any, io: Server) {
     socket.data.roomId = roomId;
 
     const roomSnapshot = await getRoom(roomId);
-    if(!roomSnapshot) return;
+    if (!roomSnapshot) return;
 
     // Tell the JOINER their full room snapshot
     socket.emit("message", {
@@ -181,7 +184,11 @@ export async function leaveRoom(socket: any, io: Server): Promise<void> {
 
     if (remainingCount === 0) {
         await deleteRoomEntirely(roomId);
-        return;
+        await deleteGame(roomId);
+        await cancelRotation(roomId);
+        await cancelRespawn(roomId, socket.id); // this player's own pending respawn, if any
+        clearGridCache(roomId);
+        clearKillerIdCache(roomId);
     } else if (wasHost) {
         const newHost = await assignNewHost(roomId);
         if (!newHost) return;
@@ -317,6 +324,7 @@ export async function startGame(socket: any, io: Server): Promise<any> {
 
     const killerOrder = [...playerIds].sort(() => Math.random() - 0.5);
     const killerId = killerOrder[0];
+    setCachedKillerId(roomId, killerId);
     const durationMs = playerIds.length * 20000;
 
     await redis.hset(`game:${roomId}`, {
@@ -359,27 +367,22 @@ export async function movePlayer(socket: any, direction: string, io: Server): Pr
     if (now - moveState.lastMoveAt < 150) return;
 
     const deltas: Record<string, GridPos> = {
-        up: { row: -1, col: 0 },
-        down: { row: 1, col: 0 },
-        left: { row: 0, col: -1 },
-        right: { row: 0, col: 1 },
+        up: { row: -1, col: 0 }, down: { row: 1, col: 0 },
+        left: { row: 0, col: -1 }, right: { row: 0, col: 1 },
     };
     const delta = deltas[direction];
     if (!delta) return;
 
-    const target: GridPos = {
-        row: moveState.pos.row + delta.row,
-        col: moveState.pos.col + delta.col,
-    };
-
+    const target: GridPos = { row: moveState.pos.row + delta.row, col: moveState.pos.col + delta.col };
     if (target.row < 0 || target.row >= grid.length || target.col < 0 || target.col >= grid[0].length) return;
     if (grid[target.row][target.col] === 0) return;
 
-    const killerId = await getKillerId(roomId);
+    const killerId = getCachedKillerId(roomId); // no Redis call at all now
     const isKillerMoving = socket.id === killerId;
 
+    const others = await getOtherAlivePositions(roomId, socket.id); // fetched ONCE
+
     if (!isKillerMoving) {
-        const others = await getOtherAlivePositions(roomId, socket.id);
         const isOccupied = others.some((p) => p.row === target.row && p.col === target.col);
         if (isOccupied) {
             return socket.emit("message", { action: "MOVE_REJECTED", payload: { reason: "occupied" } });
@@ -394,7 +397,11 @@ export async function movePlayer(socket: any, direction: string, io: Server): Pr
         payload: { socketId: socket.id, pos: target },
     });
 
-    await checkForKill(roomId, io);
+    if (!killerId) return;
+
+    if (isKillerMoving) {
+        await checkForKill(roomId, killerId, target, others, io);
+    }
 }
 
 export async function kickPlayerFromRoom(socket: any, io: Server, targetSocketId: string): Promise<void> {
@@ -426,17 +433,15 @@ export async function kickPlayerFromRoom(socket: any, io: Server, targetSocketId
     });
 }
 
-export async function checkForKill(roomId: string, io: Server): Promise<void> {
-    const killerId = await getKillerId(roomId);
-    if (!killerId) return;
-
-    const killerState = await getPlayerMoveState(roomId, killerId);
-    if (!killerState || !killerState.alive) return;
-
-    const others = await getOtherAlivePositions(roomId, killerId);
-
+export async function checkForKill(
+    roomId: string,
+    killerId: string,
+    killerPos: GridPos,
+    others: { socketId: string; row: number; col: number; alive: boolean }[],
+    io: Server
+): Promise<void> {
     for (const player of others) {
-        const isSameTile = player.row === killerState.pos.row && player.col === killerState.pos.col;
+        const isSameTile = player.row === killerPos.row && player.col === killerPos.col;
         if (!isSameTile) continue;
 
         await markPlayerDead(roomId, player.socketId);
@@ -498,6 +503,7 @@ export async function endGame(roomId: string, io: Server): Promise<void> {
     await scheduleRematchResolution(roomId, 15000);
     await deleteGame(roomId);
     clearGridCache(roomId);
+    clearKillerIdCache(roomId);
 
     io.to(roomId).emit("message", {
         action: "GAME_ENDED",

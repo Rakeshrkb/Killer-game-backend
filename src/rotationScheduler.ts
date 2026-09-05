@@ -2,6 +2,7 @@
 import { redis } from "./redisClient";
 import { Server } from "socket.io";
 import { endGame } from "./gameRoomInRedis";
+import { setCachedKillerId } from './killerIdCache';
 const PENDING_ROTATIONS_KEY = "pending_rotations";
 const SWEEP_INTERVAL_MS = 250;
 export const ROTATION_DURATION_MS = 20_000; // however long a killer holds the role
@@ -44,70 +45,72 @@ export async function cancelRotation(roomId: string) {
 }
 
 async function executeRotation(roomId: string, io: Server) {
-    const gameKey = `game:${roomId}`;
+  const gameKey = `game:${roomId}`;
 
-    const [
-        killerOrderRaw,
-        killerTurnIndexRaw,
-        statusRaw,
-        previousKillerId,
-    ] = await redis.hmget(
-        gameKey,
-        "killerOrder",
-        "killerTurnIndex",
-        "status",
-        "killerId"
-    );
+  const [
+    killerOrderRaw,
+    killerTurnIndexRaw,
+    statusRaw,
+    previousKillerId,
+  ] = await redis.hmget(
+    gameKey,
+    "killerOrder",
+    "killerTurnIndex",
+    "status",
+    "killerId"
+  );
 
-    if (statusRaw !== "ACTIVE") {
-        await redis.zrem(PENDING_ROTATIONS_KEY, roomId);
-        return;
-    }
+  if (statusRaw !== "ACTIVE") {
+    await redis.zrem(PENDING_ROTATIONS_KEY, roomId);
+    return;
+  }
 
-    const killerOrder: string[] = JSON.parse(killerOrderRaw || "[]");
+  const killerOrder: string[] = JSON.parse(killerOrderRaw || "[]");
 
-    if (killerOrder.length === 0) {
-        await redis.zrem(PENDING_ROTATIONS_KEY, roomId);
-        return;
-    }
+  if (killerOrder.length === 0) {
+    await redis.zrem(PENDING_ROTATIONS_KEY, roomId);
+    return;
+  }
 
-    const currentIndex = parseInt(killerTurnIndexRaw || "0", 10);
+  const currentIndex = parseInt(killerTurnIndexRaw || "0", 10);
 
-    // Current killer was the LAST player in the rotation.
-    // Therefore everyone has had one killer turn.
-    if (currentIndex === killerOrder.length - 1) {
-        await redis.zrem(PENDING_ROTATIONS_KEY, roomId);
+  // Current killer was the LAST player in the rotation.
+  // Therefore everyone has had one killer turn.
+  if (currentIndex === killerOrder.length - 1) {
+    await redis.zrem(PENDING_ROTATIONS_KEY, roomId);
 
-        await endGame(roomId, io);
+    await endGame(roomId, io);
 
-        return;
-    }
+    return;
+  }
 
-    // Move to next killer
-    const nextIndex = currentIndex + 1;
-    const newKillerId = killerOrder[nextIndex];
+  // Move to next killer
+  const nextIndex = currentIndex + 1;
+  const newKillerId = killerOrder[nextIndex];
 
-    await redis.hset(
-        gameKey,
-        "killerTurnIndex",
-        nextIndex,
-        "killerId",
-        newKillerId
-    );
+  await redis.hset(
+    gameKey,
+    "killerTurnIndex",
+    nextIndex,
+    "killerId",
+    newKillerId
+  );
 
-    await scheduleNextRotation(roomId, ROTATION_DURATION_MS);
+  await scheduleNextRotation(roomId, ROTATION_DURATION_MS);
 
-    if (previousKillerId) {
-        io.to(previousKillerId).emit("message", {
-            action: "YOU_ARE_NOT_KILLER",
-            result: "success",
-        });
-    }
-
-    io.to(newKillerId).emit("message", {
-        action: "YOU_ARE_KILLER",
-        result: "success",
+  if (previousKillerId) {
+    io.to(previousKillerId).emit("message", {
+      action: "YOU_ARE_NOT_KILLER",
+      result: "success",
     });
+  }
+
+  io.to(newKillerId).emit("message", {
+    action: "YOU_ARE_KILLER",
+    result: "success",
+  });
+  
+  setCachedKillerId(roomId, newKillerId);
 }
 
 export function startRotationSweep(io: Server) {

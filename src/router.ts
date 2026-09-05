@@ -1,6 +1,7 @@
 import { Server } from 'socket.io';
 import { createRoom, joinRoom, kickPlayerFromRoom, setPlayerName, togglePlayerReady, leaveRoom, startGame, movePlayer, playAgain } from './gameRoomInRedis';
 import { sendMessage } from './chatRoomInRedis';
+import { handlePing } from './ping';
 export const routeMessage = (message: any, socket: any, io: Server) => {
     switch (message.action) {
         case "SET_NAME":
@@ -32,6 +33,9 @@ export const routeMessage = (message: any, socket: any, io: Server) => {
             break;
         case "SEND_CHAT":
             sendMessage(socket, io, message.payload.text);
+            break;
+        case "PING":
+            handlePing(socket, message.payload);
             break;
         default:
             console.warn("Unknown action:", message.action);
