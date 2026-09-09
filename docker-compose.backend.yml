@@ -43,3 +43,4 @@ services:
 
 volumes:
   visitor_data:
+  redis_data:
