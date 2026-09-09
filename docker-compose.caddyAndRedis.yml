@@ -26,7 +26,7 @@ services:
     command: >
       sh -c '
       if [ ! -s /data/sentinel.conf ]; then
-      printf "port 26379\nsentinel resolve-hostnames yes\nsentinel monitor %s %s 6379 2\nsentinel auth-pass %s %s\nsentinel down-after-milliseconds %s 5000\nsentinel failover-timeout %s 10000\nsentinel parallel-syncs %s 1\n" "$REDIS_MASTER_NAME" "$REDIS_PRIMARY_ADDR" "$REDIS_MASTER_NAME" "$REDIS_PASSWORD" "$REDIS_MASTER_NAME" "$REDIS_MASTER_NAME" "$REDIS_MASTER_NAME" > /data/sentinel.conf;
+      printf "port 26379\nsentinel resolve-hostnames yes\nsentinel announce-ip %s\nsentinel announce-port 26379\nsentinel monitor %s %s 6379 2\nsentinel auth-pass %s %s\nsentinel down-after-milliseconds %s 5000\nsentinel failover-timeout %s 10000\nsentinel parallel-syncs %s 1\n" "$$SENTINEL_ANNOUNCE_IP" "$$REDIS_MASTER_NAME" "$$REDIS_PRIMARY_ADDR" "$$REDIS_MASTER_NAME" "$$REDIS_PASSWORD" "$$REDIS_MASTER_NAME" "$$REDIS_MASTER_NAME" "$$REDIS_MASTER_NAME" > /data/sentinel.conf;
       fi &&
       redis-server /data/sentinel.conf --sentinel'
 
