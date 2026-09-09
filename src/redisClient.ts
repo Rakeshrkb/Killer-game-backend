@@ -1,7 +1,30 @@
 // redisClient.ts
-import { createAdapter } from '@socket.io/redis-adapter';
 import Redis from "ioredis";
-export const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
+// export const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
+const sentinelPort = Number(
+    process.env.REDIS_SENTINEL_PORT || 26379
+);
+
+function requireEnv(name: string): string {
+    const value = process.env[name];
+    if (!value) throw new Error(`Missing required env var: ${name}`);
+    return value;
+}
+
+const sentinels = [
+    requireEnv("REDIS_SENTINEL_1"),
+    requireEnv("REDIS_SENTINEL_2"),
+    requireEnv("REDIS_SENTINEL_3"),
+].map((host) => ({ host, port: sentinelPort }));
+
+export const redis = new Redis({
+    sentinels,
+    name: process.env.REDIS_MASTER_NAME || "mymaster",
+    password: process.env.REDIS_PASSWORD,
+    sentinelRetryStrategy: (times) => Math.min(times * 100, 2000),
+    retryStrategy: (times) => Math.min(times * 100, 2000),
+});
+
 export const subClient = redis.duplicate();
 
 

@@ -36,22 +36,22 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
-      - name: Deploy to both backend instances
+      - name: Deploy to Caddy/Redis instance (primary)
+        run: |
+          aws ssm send-command \
+            --instance-ids "i-037a6772e7a98488a" \
+            --document-name "AWS-RunShellScript" \
+            --parameters commands='[
+              "sudo -u ubuntu -i bash -c \"cd /home/ubuntu/Killer-game-backend && git pull && docker compose -f docker-compose.caddyAndRedis.yml pull && docker compose -f docker-compose.caddyAndRedis.yml up -d\""
+            ]' \
+            --region ap-south-1
+
+      - name: Deploy to both backend instances (replicas)
         run: |
           aws ssm send-command \
             --instance-ids "i-0b59c69efb86e810f" "i-08c76d96829d4cca2" \
             --document-name "AWS-RunShellScript" \
             --parameters commands='[
               "sudo -u ubuntu -i bash -c \"cd /home/ubuntu/Killer-game-backend && git pull && docker compose -f docker-compose.backend.yml pull && docker compose -f docker-compose.backend.yml up -d\""
-            ]' \
-            --region ap-south-1
-
-      - name: Deploy to Caddy/Redis instance
-        run: |
-          aws ssm send-command \
-            --instance-ids "i-037a6772e7a98488a" \
-            --document-name "AWS-RunShellScript" \
-            --parameters commands='[
-              "sudo -u ubuntu -i bash -c \"cd /home/ubuntu/Killer-game-backend && git pull && docker compose -f docker-compose.caddyAndRedis.yml up -d\""
             ]' \
             --region ap-south-1
