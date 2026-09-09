@@ -32,15 +32,20 @@ services:
     restart: unless-stopped
     ports:
       - "26379:26379"
+    volumes:
+      - sentinel_data:/data
     command: >
-      redis-server --port 26379 --sentinel
-      --sentinel resolve-hostnames yes
-      --sentinel monitor ${REDIS_MASTER_NAME} ${REDIS_PRIMARY_ADDR} 6379 2
-      --sentinel auth-pass ${REDIS_MASTER_NAME} ${REDIS_PASSWORD}
-      --sentinel down-after-milliseconds ${REDIS_MASTER_NAME} 5000
-      --sentinel failover-timeout ${REDIS_MASTER_NAME} 10000
-      --sentinel parallel-syncs ${REDIS_MASTER_NAME} 1
+      sh -c "touch /data/sentinel.conf &&
+           redis-server /data/sentinel.conf --port 26379 --sentinel
+           --sentinel resolve-hostnames yes
+           --sentinel monitor ${REDIS_MASTER_NAME} ${REDIS_PRIMARY_ADDR} 6379 2
+           --sentinel auth-pass ${REDIS_MASTER_NAME} ${REDIS_PASSWORD}
+           --sentinel down-after-milliseconds ${REDIS_MASTER_NAME} 5000
+           --sentinel failover-timeout ${REDIS_MASTER_NAME} 10000
+           --sentinel parallel-syncs ${REDIS_MASTER_NAME} 1"
+
 
 volumes:
   visitor_data:
   redis_data:
+  sentinel_data:
