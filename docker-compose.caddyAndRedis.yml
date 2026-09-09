@@ -12,20 +12,23 @@ services:
       --requirepass ${REDIS_PASSWORD}
       --masterauth ${REDIS_PASSWORD}
       --appendonly yes
+
   sentinel:
     image: redis:7-alpine
     container_name: killer-game-sentinel
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "26379:26379"
+    volumes:
+      - sentinel_data:/data
     command: >
-      redis-server --port 26379 --sentinel
-      --sentinel resolve-hostnames yes
-      --sentinel monitor ${REDIS_MASTER_NAME} ${REDIS_PRIMARY_ADDR} 6379 2
-      --sentinel auth-pass ${REDIS_MASTER_NAME} ${REDIS_PASSWORD}
-      --sentinel down-after-milliseconds ${REDIS_MASTER_NAME} 5000
-      --sentinel failover-timeout ${REDIS_MASTER_NAME} 10000
-      --sentinel parallel-syncs ${REDIS_MASTER_NAME} 1
+      sh -c '
+      if [ ! -s /data/sentinel.conf ]; then
+      printf "port 26379\nsentinel resolve-hostnames yes\nsentinel monitor %s %s 6379 2\nsentinel auth-pass %s %s\nsentinel down-after-milliseconds %s 5000\nsentinel failover-timeout %s 10000\nsentinel parallel-syncs %s 1\n" "$REDIS_MASTER_NAME" "$REDIS_PRIMARY_ADDR" "$REDIS_MASTER_NAME" "$REDIS_PASSWORD" "$REDIS_MASTER_NAME" "$REDIS_MASTER_NAME" "$REDIS_MASTER_NAME" > /data/sentinel.conf;
+      fi &&
+      redis-server /data/sentinel.conf --sentinel'
 
   caddy:
     image: caddy:2-alpine
@@ -46,3 +49,4 @@ volumes:
   caddy_data:
   caddy_config:
   redis_data:
+  sentinel_data:
